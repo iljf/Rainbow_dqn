@@ -67,24 +67,25 @@ args = parser.parse_args()
 
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
-  print(' ' * 26 + k + ': ' + str(v))
+    print(' ' * 26 + k + ': ' + str(v))
 results_dir = os.path.join('../../Downloads/Rainbow-master/results', args.id)
 if not os.path.exists(results_dir):
   os.makedirs(results_dir)
+
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 np.random.seed(args.seed)
 torch.manual_seed(np.random.randint(1, 10000))
 if torch.cuda.is_available() and not args.disable_cuda:
-  args.device = torch.device('cuda')
-  torch.cuda.manual_seed(np.random.randint(1, 10000))
-  torch.backends.cudnn.enabled = args.enable_cudnn
+    args.device = torch.device('cuda')
+    torch.cuda.manual_seed(np.random.randint(1, 10000))
+    torch.backends.cudnn.enabled = args.enable_cudnn
 else:
-  args.device = torch.device('cpu')
+    args.device = torch.device('cpu')
 
 
 # Simple ISO 8601 timestamped logger
 def log(s):
-  print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
+    print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
 
 
 def load_memory(memory_path, disable_bzip):
@@ -133,13 +134,13 @@ priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn
 val_mem = ReplayMemory(args, args.evaluation_size)
 T, done = 0, True
 while T < args.evaluation_size:
-  if done:
-    state = env.reset()
-  next_state, r, done,= env.step(np.random.randint(0, action_space))
-  state = torch.Tensor(state)
-  val_mem.append(state, None, None, done)
-  state = next_state
-  T += 1
+    if done:
+        state, done = env.reset(), False
+    next_state, r, done, info = env.step(np.random.randint(0, action_space))
+    state = torch.Tensor(state)
+    val_mem.append(state, None, None, done)
+    state = next_state
+    T += 1
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
@@ -152,12 +153,15 @@ else:
   for T in trange(1, args.T_max + 1):
     if done:
       state = env.reset()
+      state = torch.Tensor(state).to(args.device)
 
     if T % args.replay_frequency == 0:
       dqn.reset_noise()  # Draw a new set of noisy weights
 
     action = dqn.act(state)  # Choose an action greedily (with noisy weights)
-    next_state, reward, done = env.step(action)  # Step
+    next_state, reward, done, info = env.step(action)
+    next_state = torch.Tensor(next_state).to(args.device)
+    # Step
     if args.reward_clip > 0:
       reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
     mem.append(state, action, reward, done)  # Append transition to memory
