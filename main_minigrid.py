@@ -6,19 +6,20 @@ from datetime import datetime
 import os
 import pickle
 
-import gym
+import gymnasium as gym
 
 # import wrappers for atari games
-from gym.wrappers import AtariPreprocessing
-from gym.wrappers import FrameStack
-from gym_minigrid.wrappers import *
+# from gym.wrappers import AtariPreprocessing
+# from gym.wrappers import FrameStack
+# from gym_minigrid.wrappers import *
+from minigrid.wrappers import *
 
 import numpy as np
 import torch
 from tqdm import trange
 
 from agent import Agent
-from env import Env
+# from env import Env
 from memory import ReplayMemory
 from test import test
 
@@ -31,8 +32,8 @@ parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
 parser.add_argument('--game', type=str, default='MiniGrid-Empty-5x5-v0', help='minigrid')
 parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS', help='Number of training steps (4x number of frames)')
 parser.add_argument('--max-episode-length', type=int, default=int(108e3), metavar='LENGTH', help='Max episode length in game frames (0 to disable)')
-parser.add_argument('--history-length', type=int, default=4, metavar='T', help='Number of consecutive states processed')
-parser.add_argument('--architecture', type=str, default='canonical', choices=['canonical', 'data-efficient'], metavar='ARCH', help='Network architecture')
+parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')
+parser.add_argument('--architecture', type=str, default='mlp', choices=['canonical', 'data-efficient', 'mlp'], metavar='ARCH', help='Network architecture')
 parser.add_argument('--hidden-size', type=int, default=512, metavar='SIZE', help='Network hidden size')
 parser.add_argument('--noisy-std', type=float, default=0.1, metavar='σ', help='Initial standard deviation of noisy linear layers')
 parser.add_argument('--atoms', type=int, default=51, metavar='C', help='Discretised size of value distribution')
@@ -108,9 +109,16 @@ def save_memory(memory, memory_path, disable_bzip):
 
 
 # Environment
-env = gym.make(args.game + 'NoFrameskip-v4')
-env = AtariPreprocessing(env, screen_size=84)
-env = FrameStack(env, 2)
+env = gym.make(args.game)
+# env = RGBImgPartialObsWrapper(env) # Get pixel observations
+env = FullyObsWrapper(env)
+env = ImgObsWrapper(env) # Get rid of the 'mission' field
+
+
+# env = AtariPreprocessing(env, screen_size=84)
+# env = FrameStack(env, 2)
+
+
 action_space = env.action_space.n
 
 # Agent
@@ -136,9 +144,14 @@ val_mem = ReplayMemory(args, args.evaluation_size)
 T, done = 0, True
 while T < args.evaluation_size:
     if done:
-        state, done = env.reset(), False
-    next_state, r, done, info = env.step(np.random.randint(0, action_space))
-    state = torch.Tensor(state)
+        state, _ = env.reset()
+        state = torch.Tensor(state)
+        # state = state.unsqueeze(0)
+        done = False
+
+    next_state, r, done, truncated, info = env.step(np.random.randint(0, action_space))
+    next_state = torch.Tensor(next_state)
+    # next_state = next_state.unsqueeze(0)
     val_mem.append(state, None, None, done)
     state = next_state
     T += 1
@@ -153,19 +166,22 @@ else:
   done = True
   for T in trange(1, args.T_max + 1):
     if done:
-      state = env.reset()
+      state, _ = env.reset()
       state = torch.Tensor(state).to(args.device)
+      # state = state.unsqueeze(0)
 
     if T % args.replay_frequency == 0:
       dqn.reset_noise()  # Draw a new set of noisy weights
 
     action = dqn.act(state)  # Choose an action greedily (with noisy weights)
-    next_state, reward, done, info = env.step(action)
+    next_state, reward, done, truncated, info = env.step(action)
     next_state = torch.Tensor(next_state).to(args.device)
+    # next_state = next_state.unsqueeze(0)
     # Step
     if args.reward_clip > 0:
       reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
-    mem.append(state, action, reward, done)  # Append transition to memory
+    # mem.append(state, action, reward, done)  # Append transition to memory
+    mem.append(state.unsqueeze(0), action, reward, done)  # Append transition to memory
 
     # Train and test
     if T >= args.learn_start:
