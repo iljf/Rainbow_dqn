@@ -21,7 +21,9 @@ from tqdm import trange
 from agent import Agent
 # from env import Env
 from memory import ReplayMemory
-from test import test
+from test import test, test_minigrid
+import wandb
+
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -53,8 +55,10 @@ parser.add_argument('--adam-eps', type=float, default=1.5e-4, metavar='ε', help
 parser.add_argument('--batch-size', type=int, default=32, metavar='SIZE', help='Batch size')
 parser.add_argument('--norm-clip', type=float, default=10, metavar='NORM', help='Max L2 norm for gradient clipping')
 parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
+# parser.add_argument('--learn-start', type=int, default=int(1), metavar='STEPS', help='Number of steps before starting training')
 parser.add_argument('--evaluate', action='store_true', help='Evaluate only')
 parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS', help='Number of training steps between evaluations')
+# parser.add_argument('--evaluation-interval', type=int, default=1, metavar='STEPS', help='Number of training steps between evaluations')
 parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', help='Number of evaluation episodes to average over')
 # TODO: Note that DeepMind's evaluation method is running the latest agent for 500K frames ever every 1M steps
 parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', help='Number of transitions to use for validating Q')
@@ -67,6 +71,12 @@ parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t z
 # Setup
 args = parser.parse_args()
 
+# wandb intialize
+"""
+ wandb.init(project="Rainbow_"+args.game,
+           config=args.__dict__
+           )
+"""
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
     print(' ' * 26 + k + ': ' + str(v))
@@ -152,22 +162,26 @@ while T < args.evaluation_size:
     next_state, r, done, truncated, info = env.step(np.random.randint(0, action_space))
     next_state = torch.Tensor(next_state)
     # next_state = next_state.unsqueeze(0)
-    val_mem.append(state, None, None, done)
+    val_mem.append(state.unsqueeze(0), None, None, done)
     state = next_state
+
+   # wandb.log({'training/reward':r.item()})
+
     T += 1
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
-  avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
+  avg_reward, avg_Q = test_minigrid(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 else:
   # Training loop
   dqn.train()
   done = True
   for T in trange(1, args.T_max + 1):
-    if done:
+    if done or truncated:
       state, _ = env.reset()
       state = torch.Tensor(state).to(args.device)
+      done, truncated = False, False
       # state = state.unsqueeze(0)
 
     if T % args.replay_frequency == 0:
@@ -192,7 +206,7 @@ else:
 
       if T % args.evaluation_interval == 0:
         dqn.eval()  # Set DQN (online network) to evaluation mode
-        avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
+        avg_reward, avg_Q = test_minigrid(args, T, dqn, val_mem, metrics, results_dir)  # Test
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
 

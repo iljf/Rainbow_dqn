@@ -7,7 +7,61 @@ from plotly.graph_objs.scatter import Line
 import torch
 
 from env import Env
+import gymnasium as gym
+from minigrid.wrappers import *
 
+def test_minigrid(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
+  env = gym.make(args.game)
+  # env = RGBImgPartialObsWrapper(env) # Get pixel observations
+  env = FullyObsWrapper(env)
+  env = ImgObsWrapper(env)  # Get rid of the 'mission' field
+
+  metrics['steps'].append(T)
+  T_rewards, T_Qs = [], []
+
+  # Test performance over several episodes
+  done = True
+  for _ in range(args.evaluation_episodes):
+    while True:
+      if done:
+        state, _ = env.reset()
+        reward_sum, done = 0, False
+        state = torch.Tensor(state).to(args.device)
+
+      action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
+      state, reward, done, truncated, info = env.step(action)  # Step
+      reward_sum += reward
+      state = torch.Tensor(state).to(args.device)
+      if args.render:
+        env.render()
+
+      if done or truncated:
+        T_rewards.append(reward_sum)
+        break
+  env.close()
+
+  # Test Q-values over validation memory
+  for state in val_mem:  # Iterate over valid states
+    T_Qs.append(dqn.evaluate_q(state))
+
+  avg_reward, avg_Q = sum(T_rewards) / len(T_rewards), sum(T_Qs) / len(T_Qs)
+  if not evaluate:
+    # Save model parameters if improved
+    if avg_reward > metrics['best_avg_reward']:
+      metrics['best_avg_reward'] = avg_reward
+      dqn.save(results_dir)
+
+    # Append to results and save metrics
+    metrics['rewards'].append(T_rewards)
+    metrics['Qs'].append(T_Qs)
+    torch.save(metrics, os.path.join(results_dir, 'metrics.pth'))
+
+    # Plot
+    _plot_line(metrics['steps'], metrics['rewards'], 'Reward', path=results_dir)
+    _plot_line(metrics['steps'], metrics['Qs'], 'Q', path=results_dir)
+
+  # Return average reward and Q-value
+  return avg_reward, avg_Q
 
 # Test DQN
 def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
