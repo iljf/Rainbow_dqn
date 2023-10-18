@@ -45,7 +45,7 @@ parser.add_argument('--V-min', type=float, default=-2, metavar='V', help='Minimu
 parser.add_argument('--V-max', type=float, default=2, metavar='V', help='Maximum of value distribution support')
 parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
 # parser.add_argument('--memory-capacity', type=int, default=int(1e6), metavar='CAPACITY', help='Experience replay memory capacity')
-parser.add_argument('--memory-capacity', type=int, default=int(10e5), metavar='CAPACITY', help='Experience replay memory capacity')
+parser.add_argument('--memory-capacity', type=int, default=int(1e6), metavar='CAPACITY', help='Experience replay memory capacity')
 parser.add_argument('--replay-frequency', type=int, default=4, metavar='k', help='Frequency of sampling from memory')
 parser.add_argument('--priority-exponent', type=float, default=0.5, metavar='ω', help='Prioritised experience replay exponent (originally denoted α)')
 parser.add_argument('--priority-weight', type=float, default=0.4, metavar='β', help='Initial prioritised experience replay importance sampling weight')
@@ -59,7 +59,7 @@ parser.add_argument('--adam-eps', type=float, default=1.5e-4, metavar='ε', help
 parser.add_argument('--batch-size', type=int, default=32, metavar='SIZE', help='Batch size')
 parser.add_argument('--norm-clip', type=float, default=10, metavar='NORM', help='Max L2 norm for gradient clipping')
 # parser.add_argument('--learn-start', type=int, default=int(20e3), metavar='STEPS', help='Number of steps before starting training')
-parser.add_argument('--learn-start', type=int, default=int(1e3), metavar='STEPS', help='Number of steps before starting training')
+parser.add_argument('--learn-start', type=int, default=int(10e3), metavar='STEPS', help='Number of steps before starting training')
 parser.add_argument('--evaluate', action='store_true', help='Evaluate only')
 # parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS', help='Number of training steps between evaluations')
 parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS', help='Number of training steps between evaluations')
@@ -67,7 +67,7 @@ parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='
 parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', help='Number of evaluation episodes to average over')
 # TODO: Note that DeepMind's evaluation method is running the latest agent for 500K frames ever every 1M steps
 # parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', help='Number of transitions to use for validating Q')
-parser.add_argument('--evaluation-size', type=int, default=5000, metavar='N', help='Number of transitions to use for validating Q')
+parser.add_argument('--evaluation-size', type=int, default=1000, metavar='N', help='Number of transitions to use for validating Q')
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
 parser.add_argument('--checkpoint-interval', default=0, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
@@ -79,7 +79,7 @@ args = parser.parse_args()
 
 # wandb intialize
 wandb.init(project="Rainbow_revision",
-           name=args.game+"test4",
+           name=args.game + str(datetime.now()),
            config=args.__dict__
            )
 
@@ -183,7 +183,6 @@ if args.evaluate:
   avg_reward, avg_Q = test_minigrid(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 
-  # wandb.log({'training/Q-value': avg_Q})
 
 else:
 
@@ -194,26 +193,23 @@ else:
     if done or truncated:
       state, _ = env.reset(seed=42)
       state = torch.Tensor(state).to(args.device)
+      eps = 0.5
       # done, truncated = False, False
       # state = state.unsqueeze(0)
 
     if T % args.replay_frequency == 0:
       dqn.reset_noise()  # Draw a new set of noisy weights
 
-    action = dqn.act(state)  # Choose an action greedily (with noisy weights)
+    if np.random.rand() < eps:
+        action = np.random.randint(0, action_space)
+    else:
+        action = dqn.act(state)  # Choose an action greedily (with noisy weights)
     # with torch.no_grad():
     #     value = dqn.online_net(state)(action)
     next_state, reward, done, truncated, info = env.step(action)
     next_state = torch.Tensor(next_state).to(args.device)
     # next_state = next_state.unsqueeze(0)
     # Step
-
-    # for _i in range(len(done)):
-    #     if done[_i]:
-    #         wandb.log(
-    #             {"training/episode/reward": info[_i]['returns/episodic_reward'],
-    #              "training/episode/length": info[_i]['returns/episodic_length']
-    #              })
 
     if args.reward_clip > 0:
       reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
