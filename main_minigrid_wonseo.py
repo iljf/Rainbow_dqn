@@ -24,6 +24,8 @@ from memory import ReplayMemory
 from test import test, test_minigrid
 import wandb
 
+from util_wrapper import *
+
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -73,12 +75,13 @@ parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (f
 parser.add_argument('--checkpoint-interval', default=0, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
 parser.add_argument('--memory', help='Path to save/load the memory from')
 parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t zip the memory file. Not recommended (zipping is a bit slower and much, much smaller)')
+parser.add_argument('--env-max-step', type=int, default=1000)
 
 # Setup
 args = parser.parse_args()
 
 # wandb intialize
-wandb.init(project="Rainbow_revision",
+wandb.init(project="Rainbow_dk_test",
            name=args.game + str(datetime.now()),
            config=args.__dict__
            )
@@ -86,7 +89,7 @@ wandb.init(project="Rainbow_revision",
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
     print(' ' * 26 + k + ': ' + str(v))
-results_dir = os.path.join('../../Downloads/Rainbow-master/results', args.id)
+results_dir = os.path.join('./results', args.id)
 if not os.path.exists(results_dir):
   os.makedirs(results_dir)
 
@@ -130,8 +133,7 @@ def save_memory(memory, memory_path, disable_bzip):
 env = gym.make(args.game)
 # env = gym.make(args.game, render_mode = 'human')
 # env = RGBImgPartialObsWrapper(env) # Get pixel observations
-env = FullyObsWrapper(env)
-env = ImgObsWrapper(env) # Get rid of the 'mission' field
+env = flatten_fullview_wrapperWrapper(env, reward_reg=5000, env_max_step=args.env_max_step)
 
 
 # env = AtariPreprocessing(env, screen_size=84)
