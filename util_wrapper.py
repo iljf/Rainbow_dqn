@@ -91,11 +91,12 @@ class ReturnWrapper_wargs(ReturnWrapper):
         self.steps = 0
         self.multiplier = reward_reg
         self.max_steps = max_steps
+        self.step_discount = 1
 
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
         # reward = np.ceil(reward)*self.multiplier/(self.steps+1)
-
+        # reward -= self.step_discount
         # print reward if reward is not 0
         if reward != 0:
             reward = 1

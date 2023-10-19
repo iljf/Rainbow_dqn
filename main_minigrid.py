@@ -36,21 +36,21 @@ parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS', hel
 parser.add_argument('--max-episode-length', type=int, default=int(108e3), metavar='LENGTH', help='Max episode length in game frames (0 to disable)')
 parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')
 parser.add_argument('--architecture', type=str, default='mlp', choices=['canonical', 'data-efficient', 'mlp'], metavar='ARCH', help='Network architecture')
-parser.add_argument('--hidden-size', type=int, default=512, metavar='SIZE', help='Network hidden size')
+parser.add_argument('--hidden-size', type=int, default=128, metavar='SIZE', help='Network hidden size')
 parser.add_argument('--noisy-std', type=float, default=0.1, metavar='σ', help='Initial standard deviation of noisy linear layers')
 parser.add_argument('--atoms', type=int, default=51, metavar='C', help='Discretised size of value distribution')
 parser.add_argument('--V-min', type=float, default=-10, metavar='V', help='Minimum of value distribution support')
 parser.add_argument('--V-max', type=float, default=10, metavar='V', help='Maximum of value distribution support')
 parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
 parser.add_argument('--memory-capacity', type=int, default=int(1e6), metavar='CAPACITY', help='Experience replay memory capacity')
-parser.add_argument('--replay-frequency', type=int, default=4, metavar='k', help='Frequency of sampling from memory')
+parser.add_argument('--replay-frequency', type=int, default=1, metavar='k', help='Frequency of sampling from memory')
 parser.add_argument('--priority-exponent', type=float, default=0.5, metavar='ω', help='Prioritised experience replay exponent (originally denoted α)')
 parser.add_argument('--priority-weight', type=float, default=0.4, metavar='β', help='Initial prioritised experience replay importance sampling weight')
 parser.add_argument('--multi-step', type=int, default=3, metavar='n', help='Number of steps for multi-step return')
 parser.add_argument('--discount', type=float, default=0.99, metavar='γ', help='Discount factor')
-parser.add_argument('--target-update', type=int, default=int(8e3), metavar='τ', help='Number of steps after which to update target network')
-parser.add_argument('--reward-clip', type=int, default=1, metavar='VALUE', help='Reward clipping (0 to disable)')
-parser.add_argument('--learning-rate', type=float, default=0.0000625, metavar='η', help='Learning rate')
+parser.add_argument('--target-update', type=int, default=int(1e3), metavar='τ', help='Number of steps after which to update target network')
+parser.add_argument('--reward-clip', type=int, default=0, metavar='VALUE', help='Reward clipping (0 to disable)')
+parser.add_argument('--learning-rate', type=float, default=0.03, metavar='η', help='Learning rate')
 parser.add_argument('--adam-eps', type=float, default=1.5e-4, metavar='ε', help='Adam epsilon')
 parser.add_argument('--batch-size', type=int, default=32, metavar='SIZE', help='Batch size')
 parser.add_argument('--norm-clip', type=float, default=10, metavar='NORM', help='Max L2 norm for gradient clipping')
@@ -177,6 +177,7 @@ else:
   # Training loop
   dqn.train()
   done = True
+  ep_reward = 0
   for T in trange(1, args.T_max + 1):
     if done or truncated:
       state, _ = env.reset()
@@ -189,6 +190,7 @@ else:
 
     action = dqn.act(state)  # Choose an action greedily (with noisy weights)
     next_state, reward, done, truncated, info = env.step(action)
+    ep_reward += reward
     next_state = torch.Tensor(next_state).to(args.device)
     # next_state = next_state.unsqueeze(0)
     # Step
