@@ -212,6 +212,7 @@ else:
     #     value = dqn.online_net(state)(action)
     next_state, reward, done, truncated, info = env.step(action)
     next_state = torch.Tensor(next_state).to(args.device)
+    # print(env.total_rewards)
     # next_state = next_state.unsqueeze(0)
     # Step
 

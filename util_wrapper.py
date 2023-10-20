@@ -116,12 +116,12 @@ class ReturnWrapper_wargs(ReturnWrapper):
             truncated = False
         if done or truncated:
             info['returns/episodic_reward'] = self.total_rewards
-            if self.total_rewards != -1000:
-                self.total_rewards =0
+            # if self.total_rewards != -1000:
+            #     self.total_rewards =0
 
             info['returns/episodic_length'] = self.steps
-            self.total_rewards = 0
-            self.steps = 0
+            # self.total_rewards = 0
+            # self.steps = 0
         else:
             info['returns/episodic_reward'] = None
             info['returns/episodic_length'] = None
