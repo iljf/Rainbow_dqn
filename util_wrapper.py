@@ -94,6 +94,10 @@ class ReturnWrapper_wargs(ReturnWrapper):
         self.step_discount = 1
 
     def step(self, action):
+        # eps = 0.25
+        # if np.random.rand() < eps:
+        #     action = self.env.action_space.sample()
+
         obs, reward, done, truncated, info = self.env.step(action)
         # reward = np.ceil(reward)*self.multiplier/(self.steps+1)
         # reward -= self.step_discount
