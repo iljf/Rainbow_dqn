@@ -195,6 +195,8 @@ else:
     if done or truncated:
       # print episode rewards
       print('episode reward: ', env.total_rewards)
+      wandb.log({'training/ep_reward':  env.total_rewards
+                   })
       state, _ = env.reset(seed=42)
       state = torch.Tensor(state).to(args.device)
       eps = 0.05
