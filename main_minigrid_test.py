@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(description='Rainbow')
 parser.add_argument('--id', type=str, default='default', help='Experiment ID')
 parser.add_argument('--seed', type=int, default=123, help='Random seed')
 parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-parser.add_argument('--game', type=str, default='MiniGrid-Empty-5x5-v0', help='minigrid')
+parser.add_argument('--game', type=str, default='MiniGrid-LavaGapS5-v0', help='minigrid')
 # parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS', help='Number of training steps (4x number of frames)')
 parser.add_argument('--T-max', type=int, default=int(5e6), metavar='STEPS', help='Number of training steps (4x number of frames)')
 # parser.add_argument('--max-episode-length', type=int, default=int(108e3), metavar='LENGTH', help='Max episode length in game frames (0 to disable)')
@@ -64,7 +64,7 @@ parser.add_argument('--norm-clip', type=float, default=10, metavar='NORM', help=
 parser.add_argument('--learn-start', type=int, default=int(10e3), metavar='STEPS', help='Number of steps before starting training')
 parser.add_argument('--evaluate', action='store_true', help='Evaluate only')
 # parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS', help='Number of training steps between evaluations')
-parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS', help='Number of training steps between evaluations')
+parser.add_argument('--evaluation-interval', type=int, default=10000, metavar='STEPS', help='Number of training steps between evaluations')
 # parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', help='Number of evaluation episodes to average over')
 parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', help='Number of evaluation episodes to average over')
 # TODO: Note that DeepMind's evaluation method is running the latest agent for 500K frames ever every 1M steps
@@ -75,14 +75,14 @@ parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (f
 parser.add_argument('--checkpoint-interval', default=0, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
 parser.add_argument('--memory', help='Path to save/load the memory from')
 parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t zip the memory file. Not recommended (zipping is a bit slower and much, much smaller)')
-parser.add_argument('--env-max-step', type=int, default=5000)
+parser.add_argument('--env-max-step', type=int, default=500)
 
 # Setup
 args = parser.parse_args()
 
 # wandb intialize
-wandb.init(project="Rainbow_dk_test",
-           name=args.game + str(datetime.now()),
+wandb.init(project="Sunrise+Rainbow_minigrid",
+           name="Rainbow" + args.game + str(datetime.now()),
            config=args.__dict__
            )
 
@@ -132,12 +132,14 @@ def save_memory(memory, memory_path, disable_bzip):
 # Environment
 env = gym.make(args.game, render_mode = 'rgb_array')
 # env = gym.make(args.game, render_mode = 'human')
-# env = RGBImgPartialObsWrapper(env) # Get pixel observations
-env = flatten_fullview_wrapperWrapper(env, reward_reg=5000, env_max_step=args.env_max_step)
+env = FullyObsWrapper(env) # Get pixel observations
+env = ImgObsWrapper(env)
+# env = ReturnWrapper(env)
+# env = flatten_fullview_wrapperWrapper(env, reward_reg=5000, env_max_step=args.env_max_step)
 
 
-# env = AtariPreprocessing(env, screen_size=84)
-# env = FrameStack(env, 2)
+# env = AtariPreprocessing(env, screen_size=84) # atari
+# env = FrameStack(env, 2) # atari
 
 
 action_space = env.action_space.n
@@ -194,12 +196,12 @@ else:
   for T in trange(1, args.T_max + 1):
     if done or truncated:
       # print episode rewards
-      print('episode reward: ', env.total_rewards)
-      wandb.log({'training/ep_reward':  env.total_rewards
-                   })
+      # print('episode reward: ', env.total_rewards)
+      # wandb.log({'training/ep_reward':  env.total_rewards
+      #              })
       state, _ = env.reset(seed=42)
       state = torch.Tensor(state).to(args.device)
-      eps = 0.05
+      eps = 0.3
       # done, truncated = False, False
       # state = state.unsqueeze(0)
 

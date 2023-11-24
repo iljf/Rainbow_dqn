@@ -64,7 +64,6 @@ class ReturnWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
         reward=reward*100-self.steps-1
-
         # if np.any([done, truncated]):
         #     done = True
 
